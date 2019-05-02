@@ -128,6 +128,12 @@ public:
 		m_CordsSystem.x += dx;
 		m_CordsSystem.y += dy;
 	}
+	
+	void ResetCordsSystem()
+	{
+		m_CordsSystem.x = m_prcSize.right / 2;
+		m_CordsSystem.y = m_prcSize.bottom / 2;
+	}
 
 	void ChangeSize(int nDelta)
 	{

@@ -31,6 +31,8 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 		if (wParam == VK_DELETE) g_CellColony.RemoveCell();
 		if (wParam == VK_RETURN && g_CellColony.Alive()) g_CellColony.Start();
 		if (wParam == VK_SPACE) g_CellColony.Pause();
+		if (wParam == VK_ESCAPE) g_CellColony.End();
+		if (wParam == VK_F1) g_UserWindow.ResetCordsSystem();
 		if (wParam == VK_DOWN)
 		{
 			if (nTimer < 1000)
@@ -154,14 +156,9 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	// Draw user interface.
 	RECT rcClient;
 	GetClientRect(m_hWindow, &rcClient);
-	RECT rcGrowthSpeed = { 4, 4, rcClient.right / 4, 36 };
-	FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(255, 255, 255)));
-	rcGrowthSpeed = { 5, 5, rcClient.right / 4 - 1, 35 };
-	FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(0, 0, 0)));
-	MoveToEx(hdcBuffer, 0, 40, NULL);
-	LineTo(hdcBuffer, rcClient.right, 40);
-	MoveToEx(hdcBuffer, rcClient.right / 8, 5, NULL);
-	LineTo(hdcBuffer, rcClient.right / 8, 35);
+	RECT rcGrowthSpeed = { 5, 5, rcClient.right / 4 - 1, 35 };
+	SelectObject(hdcBuffer, GetStockObject(DC_BRUSH));
+
 	if (g_CellColony.GrowthSpeed() > 0)
 	{
 		rcGrowthSpeed = { rcClient.right / 8 + 1, 5, 
@@ -174,6 +171,22 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 			rcClient.right / 8 - (int)((rcClient.right / 8 - 2) * (-1) * g_CellColony.GrowthSpeed() / MAX_SPEED), 35 };
 		FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(210, 13, 45)));
 	}
+
+	rcGrowthSpeed = { 4, 4, rcClient.right / 4, 36 };
+	SetDCBrushColor(hdcBuffer, RGB(255, 255, 255));
+	HRGN hrgnFrame = CreateRoundRectRgn(rcGrowthSpeed.left, rcGrowthSpeed.top, rcGrowthSpeed.right, rcGrowthSpeed.bottom, 20, 20);
+	FrameRgn(hdcBuffer, hrgnFrame, hbrWhite, 1, 1);
+
+	HRGN hrgnRect = CreateRectRgn(0, 0, rcClient.right / 4 + 3, 39);
+	HRGN hrgnBorder = CreateRectRgn(0, 0, 0, 0);
+	CombineRgn(hrgnBorder, hrgnRect, hrgnFrame, RGN_DIFF);
+	FillRgn(hdcBuffer, hrgnBorder, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+	MoveToEx(hdcBuffer, 0, 40, NULL);
+	LineTo(hdcBuffer, rcClient.right, 40);
+	MoveToEx(hdcBuffer, rcClient.right / 8, 5, NULL);
+	LineTo(hdcBuffer, rcClient.right / 8, 35);
+
 	SetBkMode(hdcBuffer, TRANSPARENT);
 	SetTextColor(hdcBuffer, RGB(255, 255, 255));
 	std::string strNumber = std::to_string(g_CellColony.Size());
@@ -182,12 +195,13 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	strNumber = std::to_string(CalculateFPS());
 	strInfo = "FPS: " + strNumber;
 	TextOut(hdcBuffer, rcClient.right / 4 + 100, 12, strInfo.c_str(), strInfo.length());
-	strInfo = "Press LMB to put a cell, press RBM to move the view and use the mouse scroll to zoom. Use arrows to regulate simulation speed.";
+	strInfo = "Press LMB to put a cell, press RMB to move the view and use the mouse scroll to zoom. Use arrows to regulate simulation speed.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 4, strInfo.c_str(), strInfo.length());
 	strInfo = "Press DEL to remove the last put cell, press ENTER to start simulation, SPACE to pause it and ESC to end.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 22, strInfo.c_str(), strInfo.length());
 
 	// Draw all cells.
+	SelectObject(hdcBuffer, hbrWhite);
 	for (int i = 0; i < pColony->Size(); ++i)
 	{
 		x = pColony->GetX(i) * m_CordsSystem.size + m_CordsSystem.x;
