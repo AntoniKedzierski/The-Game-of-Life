@@ -1,8 +1,24 @@
 #include <iostream>
+#include <exception>
+#include "application.h"
 using namespace std;
 
-int main()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
 {
-	cout << "Hello World!\n";
-	return 0;
+	CUserWindow::CreateWindowsClass();
+	g_UserWindow = CUserWindow("The Game of Life", 600, 400);
+	g_UserWindow.Show();
+
+	MSG msg;
+	msg.message = WM_NULL;
+	while (msg.message != WM_QUIT)
+	{
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+
+	return static_cast<INT>(msg.wParam);
 }
