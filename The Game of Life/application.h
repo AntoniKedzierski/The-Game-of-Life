@@ -11,25 +11,25 @@ All graphics issuses are included here, also WindowEventProc() and so on.
 #include <Windows.h>
 #include <windowsx.h>
 #include <iostream>
+#include "cellworld.h"
+
+#define REGISTERED true
+#define NOT_REGISTERED false
 
 // Let's make some windows classes, to ease a process of creating windows, buttons, etc.
 typedef class CWindow
 {
 protected:
 	std::string m_strName;
-	RECT* m_prcSize;
+	RECT m_prcSize;
 	int m_nVisible;
+	HWND m_hWindow;
 
 public:
-	CWindow() : m_strName(""), m_prcSize(nullptr), m_nVisible(SW_HIDE) { }
-	CWindow(std::string strName, RECT rcSize) : m_strName(strName), m_nVisible(SW_HIDE)
+	CWindow() : m_strName(""), m_prcSize(tagRECT()), m_nVisible(SW_HIDE), m_hWindow(NULL) { }
+	CWindow(std::string strName, RECT rcSize) : m_strName(strName), m_nVisible(SW_HIDE), m_hWindow(NULL)
 	{
-		m_prcSize = new RECT();
-		*m_prcSize = rcSize;
-	}
-	~CWindow()
-	{
-		delete m_prcSize;
+		m_prcSize = rcSize;
 	}
 
 	virtual void Show()
@@ -43,40 +43,111 @@ public:
 	}
 } *LPWINDOW;
 
+// It is our main window class.
 typedef class CUserWindow : public CWindow
 {
-static WNDCLASSEX m_WndClassEx;
+public:
+	static WNDCLASSEX s_WndClassEx;
+	static bool s_IsRegistered;
 
 private:
 	DWORD m_dwStyle;
 	DWORD m_dwStyleEx;
+	bool m_bGetMode;
 	static LRESULT CALLBACK WindowEventProc(HWND, UINT, WPARAM, LPARAM);
+	struct CORD_SYS
+	{
+		double x = 0, y = 0;
+		int size = 0;
+	} m_CordsSystem;
 
 public:
-	CUserWindow() : CWindow(), m_dwStyle(0), m_dwStyleEx(0) { }
-	CUserWindow(std::string strName, int nWidth, int nHeigth, bool bFullScreen = false) 
-		: CWindow(strName, { 200, 200, nWidth, nHeigth }), m_dwStyle(WS_OVERLAPPEDWINDOW), m_dwStyleEx(NULL)
+	CUserWindow() : CWindow(), m_dwStyle(0), m_dwStyleEx(0), m_bGetMode(false) { }
+	CUserWindow(std::string strName, int nWidth, int nHeight, bool bFullScreen = false) 
+		: CWindow(strName, { 200, 200, nWidth, nHeight }), m_dwStyle(WS_OVERLAPPEDWINDOW), m_dwStyleEx(NULL), m_bGetMode(false)
 	{
-		
-
+		if (!s_IsRegistered)
+		{
+			CreateWindowsClass();
+			s_IsRegistered = true;
+		}
+		m_hWindow = CreateWindowEx(m_dwStyleEx, "user_window", strName.c_str(), m_dwStyle, 200, 200, nWidth, nHeight, NULL, NULL, GetModuleHandle(NULL), NULL);
 	}
 
 	static ATOM CreateWindowsClass()
 	{
-		ZeroMemory(&m_WndClassEx, sizeof(WNDCLASSEX));
-		m_WndClassEx.cbSize = sizeof(WNDCLASSEX);
-		m_WndClassEx.hInstance = GetModuleHandle(NULL);
-		m_WndClassEx.lpszClassName = "user_window";
-		m_WndClassEx.lpfnWndProc = CUserWindow::WindowEventProc;
-		m_WndClassEx.style = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-		m_WndClassEx.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		m_WndClassEx.hCursor = LoadCursor(NULL, IDC_ARROW);
-		m_WndClassEx.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+		s_IsRegistered = NOT_REGISTERED;
+		ZeroMemory(&s_WndClassEx, sizeof(WNDCLASSEX));
+		s_WndClassEx.cbSize = sizeof(WNDCLASSEX);
+		s_WndClassEx.hInstance = GetModuleHandle(NULL);
+		s_WndClassEx.lpszClassName = "user_window";
+		s_WndClassEx.lpfnWndProc = CUserWindow::WindowEventProc;
+		s_WndClassEx.style = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
+		s_WndClassEx.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+		s_WndClassEx.hCursor = LoadCursor(NULL, IDC_ARROW);
+		s_WndClassEx.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 
-		ATOM bResult = RegisterClassEx(&m_WndClassEx);
+		ATOM bResult = RegisterClassEx(&s_WndClassEx);
 		if (!bResult) MessageBox(NULL, "B³¹d podczas inicjacji klasy okna", "Fatalny b³¹d", MB_ICONERROR);
+		s_IsRegistered = REGISTERED;
 		return bResult;
 	}
 
+	void Show() override
+	{
+		CWindow::Show();
+		ShowWindow(m_hWindow, m_nVisible);
+	}
+
+	void Hide() override
+	{
+		CWindow::Hide();
+		ShowWindow(m_hWindow, m_nVisible);
+	}
+
+	void GetModeOn()
+	{
+		m_bGetMode = true;
+	}
+
+	void GetModeOff()
+	{
+		m_bGetMode = false;
+	}
+
+	void UpdateRect()
+	{
+		GetWindowRect(m_hWindow, &m_prcSize);
+	}
+
+	// Managing a cordinate system.
+	void MoveCordsSystem(int dx, int dy)
+	{
+		m_CordsSystem.x += dx;
+		m_CordsSystem.y += dy;
+	}
+
+	void SetCordsBegining(int x, int y)
+	{
+		SetTimer(m_hWindow, 1, 100, NULL);
+		m_CordsSystem.x = x;
+		m_CordsSystem.y = y;
+		m_CordsSystem.size = 15; // Default distance between fields is 18.
+		// MessageBox(NULL, "Ustawiono pocz¹tek uk³adu wspó³rzêdnych!", "Komunikat", MB_ICONASTERISK);
+	}
+
+	// Caltulate position of a cell in a current cordinate system. The center of the cordinate system
+	// is shifted on a vector (-0.5*t, -0.5*t), where t = m_CordsSystem.size, so we must reshift it into a right place.
+	void CalculateCords(int& x, int& y)
+	{
+		x = floor((x - m_CordsSystem.x + 0.5 * m_CordsSystem.size) / (m_CordsSystem.size * 1.0));
+		y = floor((y - m_CordsSystem.y + 0.5 * m_CordsSystem.size) / (m_CordsSystem.size * 1.0));
+	}
+
+	void GetCells();
+	void DrawColony(CCellColony*);
+
 } *LPUSERWINDOW;
 
+// The main user window.
+extern CUserWindow g_UserWindow;
