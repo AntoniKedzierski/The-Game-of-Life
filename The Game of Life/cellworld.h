@@ -40,6 +40,7 @@ private:
 		}
 	} m_rcSize;
 	bool m_bLiveMode = false;
+	int m_nLastUpdate = 0;
 
 public:
 	CCellColony() : m_rcSize(OWN_RECT()) { }
@@ -71,9 +72,10 @@ public:
 	}
 
 	// Update and return a number of updated cells.
-	int UpdateCells()
+	void UpdateCells()
 	{
-		if (!m_bLiveMode) return 0;
+		if (m_vCells.size() == 0) m_bLiveMode = false;
+		if (!m_bLiveMode) return;
 		// A number of updated cells.
 		int nResult = 0;
 
@@ -146,7 +148,7 @@ public:
 		delete[] ppUpdateTable;
 
 		// Return a result
-		return nResult;
+		m_nLastUpdate = nResult;
 	}
 
 	// Check a content of a field.
@@ -168,7 +170,7 @@ public:
 	// And remove the last cell.
 	void RemoveCell()
 	{
-		if (!this->Alive()) return;
+		if (!this->Alive() || m_bLiveMode) return;
 		m_vCells.pop_back();
 		this->UpdateRegion();
 	}
@@ -209,6 +211,20 @@ public:
 		m_bLiveMode = false;
 		m_vCells.clear();
 		this->UpdateRegion();
+	}
+
+	// Start & pause a simulation.
+	void Pause()
+	{
+		if (m_vCells.size() == 0) return;
+		if (m_bLiveMode) m_bLiveMode = false;
+		else m_bLiveMode = true;
+	}
+
+	// Return amount of updated cells;
+	int GrowthSpeed() const
+	{
+		return m_nLastUpdate;
 	}
 };
 
