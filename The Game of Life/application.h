@@ -11,6 +11,7 @@ All graphics issuses are included here, also WindowEventProc() and so on.
 #include <Windows.h>
 #include <windowsx.h>
 #include <iostream>
+#include <string>
 #include "cellworld.h"
 
 #define REGISTERED true
@@ -64,7 +65,7 @@ private:
 public:
 	CUserWindow() : CWindow(), m_dwStyle(0), m_dwStyleEx(0), m_bGetMode(false) { }
 	CUserWindow(std::string strName, int nWidth, int nHeight, bool bFullScreen = false) 
-		: CWindow(strName, { 200, 200, nWidth, nHeight }), m_dwStyle(WS_OVERLAPPEDWINDOW), m_dwStyleEx(NULL), m_bGetMode(false)
+		: CWindow(strName, { 200, 200, nWidth, nHeight }), m_dwStyle(WS_OVERLAPPEDWINDOW | WS_MAXIMIZE), m_dwStyleEx(NULL), m_bGetMode(false)
 	{
 		if (!s_IsRegistered)
 		{
@@ -72,6 +73,7 @@ public:
 			s_IsRegistered = true;
 		}
 		m_hWindow = CreateWindowEx(m_dwStyleEx, "user_window", strName.c_str(), m_dwStyle, 200, 200, nWidth, nHeight, NULL, NULL, GetModuleHandle(NULL), NULL);
+		SetTimer(m_hWindow, 1, 36, NULL); // About 20 ticks per second
 	}
 
 	static ATOM CreateWindowsClass()
@@ -127,13 +129,17 @@ public:
 		m_CordsSystem.y += dy;
 	}
 
+	void ChangeSize(int nDelta)
+	{
+		if (m_CordsSystem.size * pow(1.1, nDelta) < 11 || m_CordsSystem.size * pow(1.1, nDelta) > 51) return;
+		m_CordsSystem.size *= pow(1.1, nDelta);
+	}
+
 	void SetCordsBegining(int x, int y)
 	{
-		SetTimer(m_hWindow, 1, 100, NULL);
 		m_CordsSystem.x = x;
 		m_CordsSystem.y = y;
-		m_CordsSystem.size = 15; // Default distance between fields is 18.
-		// MessageBox(NULL, "Ustawiono pocz¹tek uk³adu wspó³rzêdnych!", "Komunikat", MB_ICONASTERISK);
+		m_CordsSystem.size = 16; // Default distance between fields is 16.
 	}
 
 	// Caltulate position of a cell in a current cordinate system. The center of the cordinate system
@@ -144,7 +150,6 @@ public:
 		y = floor((y - m_CordsSystem.y + 0.5 * m_CordsSystem.size) / (m_CordsSystem.size * 1.0));
 	}
 
-	void GetCells();
 	void DrawColony(CCellColony*);
 
 } *LPUSERWINDOW;
