@@ -1,7 +1,6 @@
 #include "application.h"
 #include <chrono>
 
-#define MAX_SPEED 100.0f
 #define FPS_REFRESH_TIME 3
 
 bool CUserWindow::s_IsRegistered = false;
@@ -31,6 +30,8 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 		if (wParam == VK_DELETE) g_CellColony.RemoveCell();
 		if (wParam == VK_RETURN && g_CellColony.Alive()) g_CellColony.Start();
 		if (wParam == VK_SPACE) g_CellColony.Pause();
+		if (wParam == VK_ESCAPE) g_CellColony.End();
+		if (wParam == VK_F3) g_UserWindow.ResetCordsSystem();
 		if (wParam == VK_DOWN)
 		{
 			if (nTimer < 1000)
@@ -48,6 +49,24 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 				nTimer -= 10;
 				SetTimer(hWindow, 1, nTimer, NULL);
 			}
+		}
+		if (wParam == VK_RIGHT)
+		{
+			g_CellColony.UpdateCells(true);
+		}
+		if (wParam == VK_F1 || wParam == VK_F2)
+		{
+			CHOOSECOLOR ccl;
+			COLORREF& clResult = ccl.rgbResult;
+			COLORREF clArray[16];
+			ZeroMemory(&ccl, sizeof(CHOOSECOLOR));
+			ccl.lStructSize = sizeof(CHOOSECOLOR);
+			ccl.hwndOwner = hWindow;
+			ccl.Flags = CC_ANYCOLOR;
+			ccl.lpCustColors = clArray;
+			ChooseColor(&ccl);
+			if (wParam == VK_F1) g_UserWindow.BeginColor() = clResult;
+			if (wParam == VK_F2) g_UserWindow.EndColor() = clResult;
 		}
 		return 0;
 	case WM_RBUTTONDOWN:
@@ -132,6 +151,13 @@ int CalculateFPS()
 	return nFPS;
 }
 
+COLORREF Gradient(double fPos, COLORREF clBegin, COLORREF clEnd)
+{
+	return RGB((1 - fPos) * GetRValue(clBegin) + fPos * GetRValue(clEnd),
+			   (1 - fPos) * GetGValue(clBegin) + fPos * GetGValue(clEnd),
+			   (1 - fPos) * GetBValue(clBegin) + fPos * GetBValue(clEnd));
+}
+
 void CUserWindow::DrawColony(CCellColony* pColony)
 {
 	// Get DC from a window.
@@ -139,10 +165,6 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	HDC hdcBuffer = CreateCompatibleDC(hdcWindow);
 	HBITMAP hbmpBuffer = CreateCompatibleBitmap(hdcWindow, m_prcSize.right, m_prcSize.bottom);
 	HBITMAP hbmpOld = (HBITMAP)SelectObject(hdcBuffer, hbmpBuffer);
-	HBRUSH hbrWhite = (HBRUSH)GetStockObject(WHITE_BRUSH);
-	HBRUSH hbrOld = (HBRUSH)SelectObject(hdcBuffer, hbrWhite);
-	HPEN hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-	HPEN hOldPen = (HPEN)SelectObject(hdcBuffer, hPen);
 	HFONT hFont = CreateFont(16, 0, 0, 0, 0, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
 		ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
 	HFONT hOldFont = (HFONT)SelectObject(hdcBuffer, hFont);
@@ -154,26 +176,43 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	// Draw user interface.
 	RECT rcClient;
 	GetClientRect(m_hWindow, &rcClient);
-	RECT rcGrowthSpeed = { 4, 4, rcClient.right / 4, 36 };
-	FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(255, 255, 255)));
-	rcGrowthSpeed = { 5, 5, rcClient.right / 4 - 1, 35 };
-	FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(0, 0, 0)));
-	MoveToEx(hdcBuffer, 0, 40, NULL);
-	LineTo(hdcBuffer, rcClient.right, 40);
-	MoveToEx(hdcBuffer, rcClient.right / 8, 5, NULL);
-	LineTo(hdcBuffer, rcClient.right / 8, 35);
+	RECT rcGrowthSpeed = { 5, 5, rcClient.right / 4 - 1, 35 };
+	DeleteObject(SelectObject(hdcBuffer, GetStockObject(DC_BRUSH)));
+	DeleteObject(SelectObject(hdcBuffer, GetStockObject(DC_PEN)));
+	SetDCPenColor(hdcBuffer, RGB(255, 255, 255));
+
 	if (g_CellColony.GrowthSpeed() > 0)
 	{
 		rcGrowthSpeed = { rcClient.right / 8 + 1, 5, 
-			rcClient.right / 8 + (int)((rcClient.right / 8 - 2) * g_CellColony.GrowthSpeed() / MAX_SPEED), 35 };
+			rcClient.right / 8 + (int)((rcClient.right / 8 - 2) * g_CellColony.GrowthSpeed() / g_CellColony.MaxSpeed()), 35 };
 		FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(30, 187, 45)));
 	}
 	if (g_CellColony.GrowthSpeed() < 0)
 	{
 		rcGrowthSpeed = { rcClient.right / 8, 5,
-			rcClient.right / 8 - (int)((rcClient.right / 8 - 2) * (-1) * g_CellColony.GrowthSpeed() / MAX_SPEED), 35 };
+			rcClient.right / 8 - (int)((rcClient.right / 8 - 2) * (-1) * g_CellColony.GrowthSpeed() / g_CellColony.MaxSpeed()), 35 };
 		FillRect(hdcBuffer, &rcGrowthSpeed, CreateSolidBrush(RGB(210, 13, 45)));
 	}
+
+	rcGrowthSpeed = { 4, 4, rcClient.right / 4, 36 };
+	SetDCBrushColor(hdcBuffer, RGB(255, 255, 255));
+	HRGN hrgnFrame = CreateRoundRectRgn(rcGrowthSpeed.left, rcGrowthSpeed.top, rcGrowthSpeed.right, rcGrowthSpeed.bottom, 20, 20);
+	FrameRgn(hdcBuffer, hrgnFrame, (HBRUSH)GetStockObject(WHITE_BRUSH), 1, 1);
+
+	HRGN hrgnRect = CreateRectRgn(0, 0, rcClient.right / 4 + 3, 39);
+	HRGN hrgnBorder = CreateRectRgn(0, 0, 0, 0);
+	CombineRgn(hrgnBorder, hrgnRect, hrgnFrame, RGN_DIFF);
+	FillRgn(hdcBuffer, hrgnBorder, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+	DeleteObject(hrgnBorder);
+	DeleteObject(hrgnRect);
+	DeleteObject(hrgnFrame);
+
+	MoveToEx(hdcBuffer, 0, 40, NULL);
+	LineTo(hdcBuffer, rcClient.right, 40);
+	MoveToEx(hdcBuffer, rcClient.right / 8, 5, NULL);
+	LineTo(hdcBuffer, rcClient.right / 8, 35);
+
 	SetBkMode(hdcBuffer, TRANSPARENT);
 	SetTextColor(hdcBuffer, RGB(255, 255, 255));
 	std::string strNumber = std::to_string(g_CellColony.Size());
@@ -182,24 +221,39 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	strNumber = std::to_string(CalculateFPS());
 	strInfo = "FPS: " + strNumber;
 	TextOut(hdcBuffer, rcClient.right / 4 + 100, 12, strInfo.c_str(), strInfo.length());
-	strInfo = "Press LMB to put a cell, press RBM to move the view and use the mouse scroll to zoom. Use arrows to regulate simulation speed.";
+	strInfo = "Press LMB to put a cell, press RMB to move the view and use the mouse scroll to zoom. Use arrows to regulate a simulation speed.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 4, strInfo.c_str(), strInfo.length());
-	strInfo = "Press DEL to remove the last put cell, press ENTER to start simulation, SPACE to pause it and ESC to end.";
+	strInfo = "Press DEL to remove the last put cell, press ENTER to start a simulation, SPACE to pause it and ESC to end. Change gradient color with F1 and F2.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 22, strInfo.c_str(), strInfo.length());
 
 	// Draw all cells.
 	for (int i = 0; i < pColony->Size(); ++i)
 	{
+		x = pColony->GetX(i);
+		y = pColony->GetY(i);
+		double fDist = sqrt(x * x + y * y);
+		SetDCBrushColor(hdcBuffer, Gradient(atan(fDist / 40) / 1.57079, g_UserWindow.BeginColor(), g_UserWindow.EndColor()));
+		SetDCPenColor(hdcBuffer, Gradient(atan(fDist / 40) / 1.57079, g_UserWindow.BeginColor(), g_UserWindow.EndColor()));
 		x = pColony->GetX(i) * m_CordsSystem.size + m_CordsSystem.x;
 		y = pColony->GetY(i) * m_CordsSystem.size + m_CordsSystem.y;
 		if (y - fRadius < 40) continue;
 		Ellipse(hdcBuffer, x - fRadius, y - fRadius, x + fRadius, y + fRadius);
+		for (int j = -1; j <= 1; ++j)
+		{
+			for (int k = -1; k <= 1; ++k)
+			{
+				if (j == 0 && k == 0 || j * k != 0) continue;
+				if (GetPixel(hdcBuffer, x + j * m_CordsSystem.size, y + k * m_CordsSystem.size) != RGB(0, 0, 0))
+				{
+					MoveToEx(hdcBuffer, x - 1, y - 1, NULL);
+					LineTo(hdcBuffer, x + j * m_CordsSystem.size - 1, y + k * m_CordsSystem.size - 1);
+				}
+			}
+		}
 	}
 
 	BitBlt(hdcWindow, 0, 0, m_prcSize.right, m_prcSize.bottom, hdcBuffer, 0, 0, SRCCOPY);
 	DeleteObject(SelectObject(hdcBuffer, hOldFont));
-	DeleteObject(SelectObject(hdcBuffer, hOldPen));
-	DeleteObject(SelectObject(hdcBuffer, hbrOld));
 	DeleteObject(SelectObject(hdcBuffer, hbmpOld));
 	DeleteDC(hdcBuffer);
 	ReleaseDC(m_hWindow, hdcWindow);

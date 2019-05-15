@@ -7,7 +7,6 @@ All graphics issuses are included here, also WindowEventProc() and so on.
 */
 
 #pragma once
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <windowsx.h>
 #include <iostream>
@@ -61,6 +60,8 @@ private:
 		double x = 0, y = 0;
 		int size = 0;
 	} m_CordsSystem;
+	COLORREF m_clBegin = RGB(234, 153, 187);
+	COLORREF m_clEnd = RGB(133, 31, 115);
 
 public:
 	CUserWindow() : CWindow(), m_dwStyle(0), m_dwStyleEx(0), m_bGetMode(false) { }
@@ -128,6 +129,12 @@ public:
 		m_CordsSystem.x += dx;
 		m_CordsSystem.y += dy;
 	}
+	
+	void ResetCordsSystem()
+	{
+		m_CordsSystem.x = m_prcSize.right / 2;
+		m_CordsSystem.y = m_prcSize.bottom / 2;
+	}
 
 	void ChangeSize(int nDelta)
 	{
@@ -139,7 +146,7 @@ public:
 	{
 		m_CordsSystem.x = x;
 		m_CordsSystem.y = y;
-		m_CordsSystem.size = 16; // Default distance between fields is 16.
+		m_CordsSystem.size = 18; // Default distance between fields is 16.
 	}
 
 	// Caltulate position of a cell in a current cordinate system. The center of the cordinate system
@@ -151,6 +158,17 @@ public:
 	}
 
 	void DrawColony(CCellColony*);
+
+	// Change a color of gradient.
+	COLORREF& BeginColor()
+	{
+		return m_clBegin;
+	}
+
+	COLORREF& EndColor()
+	{
+		return m_clEnd;
+	}
 
 } *LPUSERWINDOW;
 
