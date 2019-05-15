@@ -72,6 +72,11 @@ public:
 
 	void UpdateRegion()
 	{
+		if (m_vCells.size() == 0)
+		{
+			m_rcSize = { 0, 0, 0, 0 };
+			return;
+		}
 		int nLeft = m_vCells[0].GetX(), nTop = m_vCells[0].GetY();
 		int nRight = nLeft, nBottom = nTop;
 		// Update the region of a colony.
