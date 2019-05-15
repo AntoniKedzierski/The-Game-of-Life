@@ -1,7 +1,10 @@
 #pragma once
+#include <sstream>
+#include <Windows.h>
 #include <vector>
 #define DEAD false
 #define ALIVE true
+#define MAX_DIST 20
 
 // A cell class (that's our bacterium)
 typedef class CCell
@@ -12,6 +15,7 @@ private:
 		int x;
 		int y;
 	} m_Pos;
+	int m_nNeighs = 0;
 
 public:
 	CCell() : m_Pos({ 0, 0 }) { }
@@ -19,6 +23,14 @@ public:
 
 	int GetX() const { return m_Pos.x; }
 	int GetY() const { return m_Pos.y; }
+	int& Neighbours() { return m_nNeighs; }
+
+	void operator=(const CCell& a)
+	{
+		m_Pos.x = a.GetX();
+		m_Pos.y = a.GetY();
+		m_nNeighs = a.m_nNeighs;
+	}
 } *LPCELL;
 
 // A cell colony class (gathering large amount of bacteria)
@@ -41,6 +53,7 @@ private:
 	} m_rcSize;
 	bool m_bLiveMode = false;
 	int m_nLastUpdate = 0;
+	int m_nMaxSpeed = 1;
 
 public:
 	CCellColony() : m_rcSize(OWN_RECT()) { }
@@ -59,30 +72,31 @@ public:
 
 	void UpdateRegion()
 	{
+		int nLeft = m_vCells[0].GetX(), nTop = m_vCells[0].GetY();
+		int nRight = nLeft, nBottom = nTop;
 		// Update the region of a colony.
 		for (auto item : m_vCells)
 		{
-			if (item.GetX() < m_rcSize.left) m_rcSize.left = item.GetX();
-			if (item.GetY() < m_rcSize.top) m_rcSize.top = item.GetY();
-			if (item.GetX() > m_rcSize.right) m_rcSize.right = item.GetX();
-			if (item.GetY() > m_rcSize.bottom) m_rcSize.bottom = item.GetY();
-		}/*
-		m_rcSize.left *= -1; 
-		m_rcSize.top *= -1;*/
+			if (item.GetX() < nLeft) nLeft = item.GetX();
+			if (item.GetY() < nTop) nTop = item.GetY();
+			if (item.GetX() > nRight) nRight = item.GetX();
+			if (item.GetY() > nBottom) nBottom = item.GetY();
+		}
+		m_rcSize = { nLeft, nTop, nRight, nBottom };
 	}
 
 	// Update and return a number of updated cells.
-	void UpdateCells()
+	void UpdateCells(bool bForce = false)
 	{
 		if (m_vCells.size() == 0) m_bLiveMode = false;
-		if (!m_bLiveMode) return;
+		if (!bForce && !m_bLiveMode) return;
 		// A number of updated cells.
 		int nResult = 0;
 
 		// This is only one possible region to update.
 		OWN_RECT UpdateRect = { m_rcSize.left - 1, m_rcSize.top - 1, m_rcSize.right + 1, m_rcSize.bottom + 1 };
-		int nWidth = abs(UpdateRect.right) + abs(UpdateRect.left) + 1;
-		int nHeight = abs(UpdateRect.bottom) + abs(UpdateRect.top) + 1;
+		int nWidth = abs(UpdateRect.right - UpdateRect.left) + 1;
+		int nHeight = abs(UpdateRect.bottom - UpdateRect.top) + 1;
 
 		int** ppUpdateTable = new int* [nWidth];
 		for (int i = 0; i < nWidth; ++i) ppUpdateTable[i] = new int[nHeight];
@@ -127,18 +141,31 @@ public:
 				}
 			}
 		}
-		
-		// Kill cells that lived and had too many or too few neighbours.
-		int nEnd = m_vCells.size();
-		for (int i = 0; i < nEnd; ++i)
+
+		int nSwap = m_vCells.size() - 1;
+		for (int i = 0; i <= nSwap; ++i)
 		{
-			if (ppUpdateTable[m_vCells[i].GetX() - m_rcSize.left + 1][m_vCells[i].GetY() - m_rcSize.top + 1] == 2 ||
-				ppUpdateTable[m_vCells[i].GetX() - m_rcSize.left + 1][m_vCells[i].GetY() - m_rcSize.top + 1] == 3) continue;
-			std::swap(m_vCells[i], m_vCells[nEnd - 1]);
-			nResult--;
-			nEnd--;
+			// Take a cell and read a number of its neighbours from the update table.
+			auto& item = m_vCells[i];
+			auto& swapper = m_vCells[nSwap];
+			int nValue = ppUpdateTable[item.GetX() - m_rcSize.left + 1][item.GetY() - m_rcSize.top + 1];
+			int nSwapperValue = ppUpdateTable[swapper.GetX() - m_rcSize.left + 1][swapper.GetY() - m_rcSize.top + 1];
+			if (nValue != 2 && nValue != 3)
+			{
+				if (nSwapperValue == 2 || nSwapperValue == 3)
+				{
+					std::swap(item, swapper);
+					nSwap--;
+					nResult--;
+				}
+				else
+				{
+					nSwap--;
+					i--;
+				}
+			}
 		}
-		m_vCells.resize(nEnd);
+		m_vCells.resize(nSwap + 1);
 
 		// Update the region of a colony.
 		this->UpdateRegion();
@@ -149,6 +176,7 @@ public:
 
 		// Return a result
 		m_nLastUpdate = nResult;
+		if (nResult > m_nMaxSpeed) m_nMaxSpeed = nResult;
 	}
 
 	// Check a content of a field.
@@ -225,6 +253,12 @@ public:
 	int GrowthSpeed() const
 	{
 		return m_nLastUpdate;
+	}
+
+	// Return max speed
+	int MaxSpeed() const
+	{
+		return m_nMaxSpeed;
 	}
 };
 
