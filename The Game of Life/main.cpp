@@ -2,7 +2,7 @@
 #include "application.h"
 using namespace std;
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
+int WINAPI main(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
 {
 	CUserWindow::CreateWindowsClass();
 	g_UserWindow = CUserWindow("The Game of Life", 960, 600);

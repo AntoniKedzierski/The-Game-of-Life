@@ -26,12 +26,14 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 			nWheel %= WHEEL_DELTA;
 		}
 		return 0;
+
 	case WM_KEYDOWN:
 		if (wParam == VK_DELETE) g_CellColony.RemoveCell();
 		if (wParam == VK_RETURN && g_CellColony.Alive()) g_CellColony.Start();
 		if (wParam == VK_SPACE) g_CellColony.Pause();
 		if (wParam == VK_ESCAPE) g_CellColony.End();
 		if (wParam == VK_F3) g_UserWindow.ResetCordsSystem();
+
 		if (wParam == VK_DOWN)
 		{
 			if (nTimer < 1000)
@@ -41,6 +43,7 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 				SetTimer(hWindow, 1, nTimer, NULL);
 			}
 		}
+
 		if (wParam == VK_UP)
 		{
 			if (nTimer > 25)
@@ -50,10 +53,12 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 				SetTimer(hWindow, 1, nTimer, NULL);
 			}
 		}
+
 		if (wParam == VK_RIGHT)
 		{
 			g_CellColony.UpdateCells(true);
 		}
+
 		if (wParam == VK_F1 || wParam == VK_F2)
 		{
 			CHOOSECOLOR ccl;
@@ -68,12 +73,34 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 			if (wParam == VK_F1) g_UserWindow.BeginColor() = clResult;
 			if (wParam == VK_F2) g_UserWindow.EndColor() = clResult;
 		}
+
+		if (wParam == VK_F3) {
+			OPENFILENAME ofn;
+			char lpszFileName[MAX_PATH] = "";
+
+			ZeroMemory(&ofn, sizeof(ofn));
+			ofn.lStructSize = sizeof(ofn);
+			ofn.lpstrFilter = "Pliki tekstowe (*.txt)\0*.txt\0Wszystkie pliki\0*.*\0";
+			ofn.nMaxFile = MAX_PATH;
+			ofn.lpstrFile = lpszFileName;
+			ofn.lpstrDefExt = "txt";
+			ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+			if (GetOpenFileName(&ofn))
+			{
+				g_CellColony.Load(std::string(lpszFileName));
+				g_UserWindow.SetCordsBegining(500, 500);
+				g_UserWindow.DrawColony(&g_CellColony);
+			}
+		}
+
 		return 0;
-	case WM_RBUTTONDOWN:
+
+	case WM_MBUTTONDOWN:
 		SetCapture(hWindow);
 		xMouse = GET_X_LPARAM(lParam);
 		yMouse = GET_Y_LPARAM(lParam);
 		return 0;
+
 	case WM_LBUTTONDOWN:
 		if (!g_CellColony.Alive())
 		{
@@ -95,6 +122,7 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 		}
 		g_UserWindow.DrawColony(&g_CellColony);
 		return 0;
+
 	case WM_MOUSEMOVE:
 		if (GetCapture() == hWindow)
 		{
@@ -103,19 +131,24 @@ LRESULT CALLBACK CUserWindow::WindowEventProc(HWND hWindow, UINT uMsg, WPARAM wP
 			yMouse = GET_Y_LPARAM(lParam);
 		}
 		return 0;
-	case WM_RBUTTONUP:
+
+	case WM_MBUTTONUP:
 		ReleaseCapture();
 		return 0;
+
 	case WM_TIMER:
 		g_CellColony.UpdateCells();
 		g_UserWindow.DrawColony(&g_CellColony);
 		return 0;
+
 	case WM_SIZE:
 		g_UserWindow.UpdateRect();
 		return 0;
+
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+
 	default:
 		return DefWindowProc(hWindow, uMsg, wParam, lParam);
 	}
@@ -217,13 +250,15 @@ void CUserWindow::DrawColony(CCellColony* pColony)
 	SetTextColor(hdcBuffer, RGB(255, 255, 255));
 	std::string strNumber = std::to_string(g_CellColony.Size());
 	std::string strInfo = "Colony size: " + strNumber;
-	TextOut(hdcBuffer, rcClient.right / 4 + 5, 12, strInfo.c_str(), strInfo.length());
+	std::string strGeneration = "Generation: " + std::to_string(g_CellColony.Generation());
+	TextOut(hdcBuffer, rcClient.right / 4 + 5, 4, strInfo.c_str(), strInfo.length());
+	TextOut(hdcBuffer, rcClient.right / 4 + 5, 22, strGeneration.c_str(), strGeneration.length());
 	strNumber = std::to_string(CalculateFPS());
 	strInfo = "FPS: " + strNumber;
 	TextOut(hdcBuffer, rcClient.right / 4 + 100, 12, strInfo.c_str(), strInfo.length());
-	strInfo = "Press LMB to put a cell, press RMB to move the view and use the mouse scroll to zoom. Use arrows to regulate a simulation speed.";
+	strInfo = "Press LMB to put a cell, press MMB to move the view and use the mouse scroll to zoom. Use arrows to regulate a simulation speed. Press F3 to load presets.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 4, strInfo.c_str(), strInfo.length());
-	strInfo = "Press DEL to remove the last put cell, press ENTER to start a simulation, SPACE to pause it and ESC to end. Change gradient color with F1 and F2.";
+	strInfo = "Press DEL to remove the last put cell, press ENTER to start a simulation, SPACE to pause  it and ESC to end. Change gradient color with F1 and F2.";
 	TextOut(hdcBuffer, rcClient.right / 4 + 160, 22, strInfo.c_str(), strInfo.length());
 
 	// Draw all cells.

@@ -138,8 +138,15 @@ public:
 
 	void ChangeSize(int nDelta)
 	{
-		if (m_CordsSystem.size * pow(1.1, nDelta) < 11 || m_CordsSystem.size * pow(1.1, nDelta) > 51) return;
-		m_CordsSystem.size *= pow(1.1, nDelta);
+		/*if (m_CordsSystem.size * pow(1.1, nDelta) < 11 || m_CordsSystem.size * pow(1.1, nDelta) > 100) return;
+		m_CordsSystem.size *= pow(1.1, nDelta);*/
+
+		if (m_CordsSystem.size + 5 * nDelta > 50) return;
+		if (m_CordsSystem.size + 5 * nDelta < 6) {
+			if (m_CordsSystem.size + nDelta < 4) return;
+			m_CordsSystem.size += nDelta;
+		}
+		else m_CordsSystem.size += 5 * nDelta;
 	}
 
 	void SetCordsBegining(int x, int y)

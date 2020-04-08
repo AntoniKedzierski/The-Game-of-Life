@@ -2,6 +2,7 @@
 #include <sstream>
 #include <Windows.h>
 #include <vector>
+#include <fstream>
 #define DEAD false
 #define ALIVE true
 #define MAX_DIST 20
@@ -54,6 +55,7 @@ private:
 	bool m_bLiveMode = false;
 	int m_nLastUpdate = 0;
 	int m_nMaxSpeed = 1;
+	int m_nGeneration = 0;
 
 public:
 	CCellColony() : m_rcSize(OWN_RECT()) { }
@@ -182,6 +184,9 @@ public:
 		// Return a result
 		m_nLastUpdate = nResult;
 		if (nResult > m_nMaxSpeed) m_nMaxSpeed = nResult;
+
+		// Increment generation
+		m_nGeneration++;
 	}
 
 	// Check a content of a field.
@@ -215,6 +220,25 @@ public:
 		return true;
 	}
 
+	// Load cells from file
+	void Load(std::string strFileName)
+	{
+		this->End();
+
+		std::vector<std::string> vLines;
+		std::ifstream hFile(strFileName);
+		std::string strLine;
+
+		unsigned uLine = 0;
+
+		while (std::getline(hFile, strLine)) {
+			for (int i = 0; i < strLine.length(); ++i) {
+				if (strLine[i] == 'O') AddCell(i, uLine);
+			}
+			uLine++;
+		}
+	}
+
 	// The size of our colony.
 	int Size() const
 	{
@@ -244,6 +268,7 @@ public:
 		m_bLiveMode = false;
 		m_vCells.clear();
 		this->UpdateRegion();
+		m_nGeneration = 0;
 	}
 
 	// Start & pause a simulation.
@@ -264,6 +289,12 @@ public:
 	int MaxSpeed() const
 	{
 		return m_nMaxSpeed;
+	}
+
+	// Get current generation
+	int Generation() const 
+	{
+		return m_nGeneration;
 	}
 };
 
